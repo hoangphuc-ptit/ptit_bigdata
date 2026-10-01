@@ -1,0 +1,9 @@
+{
+  "schemaVersion" : 1,
+  "policyHash" : "e8cfaa885aa0cabdc51d54c4ee15e5c7a82b70c3cb69406582ed58c47ed2e117",
+  "files" : [ {
+    "uri" : "file:/Users/sonanui/Workspace/homeworks/bigdata/data/samples/optimization-200k.csv",
+    "sha256" : "fd60e1c84555e3997eb0f33a2b40d9565d6465ac02c488639afbf790da50a086",
+    "bytes" : 21812906
+  } ]
+}

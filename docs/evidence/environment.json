@@ -1,0 +1,18 @@
+{
+  "workload": "synthetic 200000 purchase events;32 category IDs;seed21",
+  "backend": "Hadoop3.4.2 LocalJobRunner,one mapper,two reducers; not distributed",
+  "platform": "macOS-14.8.4-arm64-arm-64bit",
+  "architecture": "arm64",
+  "javaVersion": "11.0.32.1",
+  "hadoopVersion": "3.4.2",
+  "sourceSHA256": "fd60e1c84555e3997eb0f33a2b40d9565d6465ac02c488639afbf790da50a086",
+  "jarSHA256": "0c3a8175dc32ede836a528131a4a6991d9efcd2d50a6c4c15523ac269c724cb4",
+  "unitTests": 18,
+  "integrationTests": 6,
+  "pythonTests": 5,
+  "profileScanMillis": 1085,
+  "timingScope": "job=submit+wait+collect; endToEnd=CLI orchestration checks/job/output validation; withProfile adds measured profile scan, excludes original common preflight, JVM startup and profile artifact serialization",
+  "inputFingerprint": "b9b93dd70a65f2831506f6407365b5f60711005ee594f0f566d1d7f1068599f3",
+  "currentJarAfterCleanupSHA256": "8c3dad8150b1fc00bdd37e2390bbb5f7538f392a4166d3e7c32288238974cf59",
+  "cleanupNote": "jarSHA256 identifies the benchmark artifact before unused salting helpers were deleted and sampling hash renamed; aggregation algorithms unchanged"
+}

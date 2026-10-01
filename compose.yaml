@@ -1,0 +1,11 @@
+services:
+  bigdata:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ptit-bigdata:local
+    working_dir: /opt/bigdata
+    volumes:
+      - ./data:/opt/bigdata/data
+      - ./results:/opt/bigdata/results
+    command: ["bash", "scripts/demo.sh", "results/docker-demo"]

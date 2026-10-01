@@ -1,0 +1,10 @@
+.idea/
+.tools/
+.build-cache/
+target/
+data/raw/
+data/samples/
+results/
+*.log
+__pycache__/
+.DS_Store

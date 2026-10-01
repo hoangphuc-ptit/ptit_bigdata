@@ -1,0 +1,8 @@
+event_time,event_type,product_id,category_id,category_code,brand,price,user_id,user_session
+2019-10-01 00:00:00 UTC,purchase,1,1,electronics.smartphone,brand,10.00,test,session
+2019-10-01 00:00:01 UTC,purchase,1,1,electronics.smartphone,brand,20.00,test,session
+2019-10-01 00:00:02 UTC,purchase,1,1,electronics.smartphone,brand,30.00,test,session
+2019-10-01 00:00:03 UTC,view,1,1,electronics.smartphone,brand,99.00,test,session
+2019-10-01 00:00:04 UTC,purchase,2,2,,brand,0.00,test,session
+2019-10-01 00:00:05 UTC,purchase,2,2,,brand,0.01,test,session
+2019-10-01 00:00:06 UTC,purchase,2,2,,brand,0.02,test,session
