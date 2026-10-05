@@ -63,7 +63,7 @@ docker compose up -d namenode datanode
 docker compose exec namenode hdfs dfsadmin -report        # phải có "Live datanodes (1)"
 ```
 
-UI: NameNode http://127.0.0.1:9870, DataNode http://127.0.0.1:9864.
+UI: NameNode http://127.0.0.1:9870, DataNode http://127.0.0.1:9864. Client Spark chạy local trên host dùng `hdfs://localhost:8020` (NameNode publish cổng 8020, DataNode khai báo hostname `localhost` và publish 9866), xem `docs/spark-local.md`.
 
 Dataset gốc do người dùng tự đặt vào `data/raw/` (xem `docs/DATASET.md`); pipeline không tự tải. Nạp vào HDFS (chạy lại an toàn: file đã có cùng kích thước thì bỏ qua, khác kích thước thì báo lỗi, không bao giờ ghi đè):
 

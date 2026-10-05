@@ -8,3 +8,9 @@ results/
 *.log
 __pycache__/
 .DS_Store
+.venv/
+config/spark-local.env
+spark-warehouse/
+metastore_db/
+derby.log
+.pytest_cache/

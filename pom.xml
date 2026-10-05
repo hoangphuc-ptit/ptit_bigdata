@@ -15,7 +15,8 @@
   <build><finalName>revenue-aggregation</finalName><plugins>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-enforcer-plugin</artifactId><version>3.5.0</version><executions><execution><goals><goal>enforce</goal></goals><configuration><rules><requireJavaVersion><version>[11,12)</version><message>Use JDK 11 for this Hadoop project (JAVA_HOME or REVENUE_JAVA_HOME).</message></requireJavaVersion></rules></configuration></execution></executions></plugin>
     <plugin><groupId>com.diffplug.spotless</groupId><artifactId>spotless-maven-plugin</artifactId><version>2.43.0</version><configuration><java><googleJavaFormat><version>1.15.0</version></googleJavaFormat></java></configuration><executions><execution><phase>verify</phase><goals><goal>check</goal></goals></execution></executions></plugin>
-    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.0</version></plugin>
+    <!-- Package vn.edu.bigdata.revenue.spark chỉ build trong profile spark (Java 17, Spark 4); build mặc định giữ Java 11 cho Hadoop MR. -->
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.0</version><configuration><excludes><exclude>vn/edu/bigdata/revenue/spark/**</exclude></excludes><testExcludes><testExclude>vn/edu/bigdata/revenue/spark/**</testExclude></testExcludes></configuration></plugin>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.3</version></plugin>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-dependency-plugin</artifactId><version>3.8.1</version></plugin>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>3.6.0</version><executions><execution><phase>package</phase><goals><goal>shade</goal></goals><configuration>
@@ -24,5 +25,21 @@
       <filters><filter><artifact>*:*</artifact><excludes><exclude>META-INF/*.SF</exclude><exclude>META-INF/*.RSA</exclude><exclude>META-INF/*.DSA</exclude><exclude>module-info.class</exclude></excludes></filter></filters>
     </configuration></execution></executions></plugin>
   </plugins></build>
-  <profiles><profile><id>integration</id><build><plugins><plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-failsafe-plugin</artifactId><version>3.5.3</version><executions><execution><goals><goal>integration-test</goal><goal>verify</goal></goals></execution></executions></plugin></plugins></build></profile></profiles>
+  <profiles>
+    <!-- Spark local trên host: ./mvnw -Pspark package (JDK 17/21, REVENUE_JAVA_HOME). Chạy bằng spark-submit của PySpark cùng phiên bản. -->
+    <profile><id>spark</id>
+      <properties><maven.compiler.release>17</maven.compiler.release><spark.version>4.0.4</spark.version>
+        <spark.test.argLine>-Xmx1g -XX:+IgnoreUnrecognizedVMOptions --add-modules=jdk.incubator.vector --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.nio.cs=ALL-UNNAMED --add-opens=java.base/sun.security.action=ALL-UNNAMED --add-opens=java.base/sun.util.calendar=ALL-UNNAMED -Djdk.reflect.useDirectMethodHandle=false -Dio.netty.tryReflectionSetAccessible=true</spark.test.argLine></properties>
+      <dependencies>
+        <!-- hadoop-client-api/runtime của Spark bị loại để không trùng lớp với Hadoop 3.4.2 (provided) của dự án. -->
+        <dependency><groupId>org.apache.spark</groupId><artifactId>spark-sql_2.13</artifactId><version>${spark.version}</version><scope>provided</scope><exclusions><exclusion><groupId>org.apache.hadoop</groupId><artifactId>hadoop-client-api</artifactId></exclusion><exclusion><groupId>org.apache.hadoop</groupId><artifactId>hadoop-client-runtime</artifactId></exclusion></exclusions></dependency>
+      </dependencies>
+      <build><finalName>revenue-aggregation-spark</finalName><plugins>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-enforcer-plugin</artifactId><version>3.5.0</version><executions><execution><id>default</id><configuration><rules><requireJavaVersion><version>[17,22)</version><message>Profile spark cần JDK 17 hoặc 21 (REVENUE_JAVA_HOME).</message></requireJavaVersion></rules></configuration></execution></executions></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.0</version><configuration combine.self="override"/></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.3</version><configuration><argLine>${spark.test.argLine}</argLine></configuration></plugin>
+      </plugins></build>
+    </profile>
+    <profile><id>integration</id><build><plugins><plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-failsafe-plugin</artifactId><version>3.5.3</version><executions><execution><goals><goal>integration-test</goal><goal>verify</goal></goals></execution></executions></plugin></plugins></build></profile>
+  </profiles>
 </project>

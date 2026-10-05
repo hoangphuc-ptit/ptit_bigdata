@@ -8,6 +8,8 @@
 > **Cập nhật 2026-10-06 — Giai đoạn 0 hoàn tất** (T0.1–T0.5): repo build và test được trong Docker trên máy Windows; demo fixture khớp oracle. Bằng chứng: `docs/evidence/windows-docker/README.md`. Các dòng #7, #15, #19, F1, F2 và §4.3 đã được cập nhật tương ứng. Nhận định gốc ở §1.1 mục 6 được giữ lại làm lịch sử khảo sát.
 >
 > **Cập nhật 2026-10-06 — Giai đoạn 1 (T1.1–T1.6) hoàn tất, trừ T1.7 (tùy chọn):** HDFS trong Docker, nạp `2019-Oct.csv`, mẫu D1/D2 tất định, MR V1–V5 đọc/ghi HDFS trên D1, D2 đều valid và khớp nhau. Bằng chứng: `docs/evidence/hdfs/README.md`. Dòng #1, #2, #5, #8 và bảng giai đoạn 1 đã cập nhật.
+>
+> **Cập nhật 2026-10-06 — Giai đoạn 2, 4 và E1/E7 (theo chỉ đạo của nhóm):** (1) phần lõi Spark viết bằng **Java** trong package `vn.edu.bigdata.revenue.spark` (profile Maven `-Pspark`, Spark 4.0.4, chạy **local trên host**); (2) K-Means/KNN viết bằng **notebook Python** (`notebooks/`), thực thi và lưu kèm output để giữ vết. Bản PySpark cho phần lõi viết trước đó đã bị bỏ. Bằng chứng: `docs/evidence/spark-java/README.md`, `docs/evidence/ml/README.md`. D3 đổi theo §15.1; §7.6 cập nhật phân bổ local/Docker.
 
 ---
 
@@ -153,19 +155,19 @@ flowchart LR
 | 1 | Dataset Kaggle | `DONE-VERIFIED` *(2026-10-06)* | Người dùng đã tự tải `data/raw/2019-Oct.csv`, `2019-Nov.csv`; checksum, số dòng, header, giấy phép ghi trong `docs/DATASET.md` | File gốc có đủ | Không tự tải lại; thống kê chất lượng chờ T1.4/T2.2 | `sha256sum data/raw/*.csv` so với `docs/DATASET.md` |
 | 2 | Ingestion vào HDFS | `DONE-VERIFIED` *(2026-10-06)* | `scripts/hdfs-ingest.sh`, `compose.yaml` (`namenode`, `datanode`), `config/hadoop.env`; `docs/evidence/hdfs/README.md` | `2019-Oct.csv` trên HDFS, 43 block, HEALTHY, SHA-256 đọc qua HDFS trùng file gốc | `2019-Nov.csv` chưa nạp (chưa cần theo D5) | `hdfs dfs -ls /data/ecommerce/raw`, `hdfs fsck` |
 | 3 | Preflight/kiểm tra input, manifest, fingerprint | `DONE-VERIFIED` *(máy tác giả, file cục bộ)* | `DatasetPreflight.java`, `InputManifest.java`, `BoundedLineReader.java`; test `DatasetPreflightTest`; evidence `docs/evidence/input.json` | Tốt cho CSV không nén | Chỉ nhận `.csv` không nén (`DatasetPreflight.java:35-36`); một dòng malformed làm hỏng cả preflight (`:49-50`); quét đơn luồng từng byte | Chạy trên 1% mẫu Kaggle thật, ghi thời gian |
-| 4 | Làm sạch/ETL, quản lý schema | `PARTIAL` | Chính sách lọc trong `PurchasePreparation.java` (chỉ `purchase`, giá scale 2, group hợp lệ); header cố định 9 cột `CsvEventParser.java:11-12` | Chỉ phục vụ 1 phép tổng hợp; không có tầng curated | Không parse `event_time`, `product_id`, `brand`, `user_id`, `user_session`; không có Parquet; không có báo cáo chất lượng dữ liệu (null, trùng lặp, giá 0) | — |
+| 4 | Làm sạch/ETL, quản lý schema | `DONE-VERIFIED` *(2026-10-06, D1, D2)* | `spark/EventEtlJob.java` dùng `CsvEventParser.fields()` + `Money.parseMinor()`; `docs/evidence/spark-java/README.md` | Curated Parquet phân vùng `event_date`; báo cáo chất lượng (null, giá 0, trùng, loại sự kiện); bảo toàn số dòng | Chưa chạy D3 (cả tháng) | `quality.json`, `etl-run.json` |
 | 5 | Hadoop MapReduce Group By (V1–V5) | `DONE-VERIFIED` *(2026-10-06: LocalJobRunner, input/output HDFS, dữ liệu Kaggle thật D1 1% và D2 10%; trước đó: máy tác giả, synthetic)* | `hadoop/v1..v5`, `JobPlanFactory.java`; `scripts/hdfs-mr.sh`; `docs/evidence/hdfs/README.md` | Cao | Chưa chạy trên cả tháng (D3); chưa benchmark có lặp (E2); `HDFS_BYTES_READ` dưới LocalJobRunner chưa giải thích | T1.5, E2 |
-| 6 | Spark (ETL + aggregation) | `MISSING` | `grep -ri spark` không có kết quả ngoài `CLAUDE.md` | 0% | Toàn bộ | — |
-| 7 | Môi trường Hadoop/Spark | `PARTIAL` *(2026-10-06: runtime MR LocalJobRunner `DONE-VERIFIED` trên Windows/Docker; HDFS, Spark vẫn `MISSING`)* | `Dockerfile` (JDK 11 + Maven, không có Hadoop daemon); `docs/evidence/windows-docker/`; host có `E:\Library\hadoop-3.4.2` với `core-site.xml` trỏ `hdfs://localhost:8020` (**nằm ngoài repo**, không thuộc dự án) | Chỉ có runtime LocalJobRunner | HDFS, Spark; script CRLF; JDK 11 trên host | `docker compose build`, `docker compose run --rm bigdata ./mvnw -B -Pintegration verify` |
-| 8 | Lưu trữ raw/processed/aggregate | `PARTIAL` *(2026-10-06: raw + sample + output MR đã trên HDFS)* | `/data/ecommerce/raw/`, `/raw/sample/`, `/mr/<run_id>/` trên HDFS; `docs/evidence/hdfs/README.md` | Có raw và aggregate MR | Chưa có `curated` Parquet, `agg` Spark, `features` | `hdfs dfs -ls -R /data/ecommerce` |
+| 6 | Spark (ETL + aggregation) | `DONE-VERIFIED` *(2026-10-06, D1, D2; Java)* | `src/main/java/vn/edu/bigdata/revenue/spark/` (`RevenueJob` RDD A1, `EventEtlJob`, `MetricsJob` A2–A5, `ProductFeaturesJob` A7), `SparkJobsTest` (5 test); `docs/evidence/spark-java/README.md` | A1 Spark khớp tuyệt đối MR V1 và baseline Python trên D1, D2 | D3; benchmark E4/E5 có lặp | `.\scripts\spark-pipeline.ps1` |
+| 7 | Môi trường Hadoop/Spark | `DONE-VERIFIED` *(2026-10-06)* | HDFS trong Docker (`compose.yaml`, `config/hadoop.env`); MR trong Docker; Spark 4.0.4 + JDK 21 **local** (`.venv`, `config/spark-local.env.example`, `scripts/spark-local.ps1`); §7.6 | Đủ cho D1, D2 | YARN (T1.7) chưa làm; Spark trên Linux/macOS chưa thử (`scripts/spark-local.sh`) | Xem §7.6 |
+| 8 | Lưu trữ raw/processed/aggregate | `DONE-VERIFIED` *(2026-10-06)* | HDFS: `raw/`, `raw/sample/`, `mr/<run_id>/`, `curated/events/run_id=`, `agg/{revenue_by_category,funnel_by_category,trend_by_hour,funnel_by_brand}/run_id=`, `features/product/run_id=`, `ml/{kmeans,knn}/run_id=`; mỗi output có `_run.json` | Đủ vùng raw→curated→agg→features→ml | Vùng `serving/` (giai đoạn 6) | `hdfs dfs -ls -R /data/ecommerce` |
 | 9 | Tái chạy, idempotency | `DONE-VERIFIED` *(máy tác giả)* cho MR | Output bắt buộc mới (`RunOptions.java:37-38`), ghi artifact atomic create-only (`JsonArtifacts.java:25-39`), `JobFailureIT.refusesChangedInputAndExistingOutputWithoutTouchingIt` | Tốt | Chưa có quy ước `run_id` chung cho Spark; chưa có xử lý incremental theo tháng (cũng chưa cần) | — |
 | 10 | Logging, lịch sử job, xử lý lỗi | `DONE-VERIFIED` *(máy tác giả)* cho MR | `RunManifest.java` (counters, config, thời gian, lỗi), mã thoát 0/1/2 (`RevenueTool.java:136-142`), `log4j.properties` | Tốt cho MR | `config/local.properties` không được nạp: evidence ghi `mapreduce.map.speculative: "true"`, trái với file cấu hình | So `runs.json` với `config/local.properties` |
 | 11 | Backend/API | `MISSING` | Không có | — | Đưa vào phạm vi theo yêu cầu nhóm: API chỉ đọc kết quả + suy luận mô hình nhẹ (§18) | — |
 | 12 | Frontend/dashboard/trực quan hóa | `MISSING` | Không có notebook hay biểu đồ | 0% | Dashboard kết quả + trang demo mô hình (§18). Biểu đồ cho báo cáo xuất từ cùng dữ liệu | — |
 | 12b | Lớp phục vụ (serving) kết quả và mô hình | `MISSING` | Không có cơ chế xuất kết quả/mô hình ra định dạng nhẹ | 0% | Hợp đồng serving artifacts (§18.4), bước publish/sync | — |
-| 13 | K-Means | `MISSING` | — | 0% | Feature set, chọn K, đánh giá | — |
-| 14 | KNN | `MISSING` | — | 0% | Định nghĩa bài toán, đánh giá | — |
-| 15 | Kiểm thử và dữ liệu mẫu | `DONE-VERIFIED` cho MR *(máy tác giả; **tái lập trên Windows/Docker 2026-10-06**: 18 unit + 6 IT + 5 Python pass, `docs/evidence/windows-docker/`)* | 13 test Java, 2 test Python (5 test case), fixture `events.csv` + `expected-category-id.tsv` (oracle tính tay) | Tốt cho MR | Không có mẫu Kaggle thật; không có test Spark | `./mvnw -Pintegration verify` trong Docker |
+| 13 | K-Means | `DONE-VERIFIED` *(2026-10-06, D2)* | `notebooks/kmeans_product.ipynb` (đã thực thi, lưu output); `docs/evidence/ml/README.md` | Quét K 2..10 × 3 seed, 2 baseline, hồ sơ cụm, `model.json`, parity numpy 100%, E7 | K = 2 là phân tách thô; chưa chạy trên D3 | Mở notebook, xem output |
+| 14 | KNN | `DONE-VERIFIED` *(2026-10-06, D2; kết quả âm một phần)* | `notebooks/knn_product.ipynb`; `docs/evidence/ml/README.md` | Hướng B, agreement@k + bootstrap, 2 baseline, LSH recall@10 | Không vượt baseline phổ biến; hướng A chưa làm (tùy chọn) | Mở notebook |
+| 15 | Kiểm thử và dữ liệu mẫu | `DONE-VERIFIED` cho MR và Spark Java *(2026-10-06: `-Pspark` 23 test pass trên JDK 21 gồm 5 test Spark; máy tác giả; **tái lập trên Windows/Docker 2026-10-06**: 18 unit + 6 IT + 5 Python pass, `docs/evidence/windows-docker/`)* | 13 test Java, 2 test Python (5 test case), fixture `events.csv` + `expected-category-id.tsv` (oracle tính tay) | Tốt cho MR | Không có mẫu Kaggle thật; không có test Spark | `./mvnw -Pintegration verify` trong Docker |
 | 16 | Benchmark | `DONE-VERIFIED` *(máy tác giả, synthetic)* | `scripts/benchmark.py`, `docs/evidence/*` | Tốt về phương pháp (warmup, lặp, xáo thứ tự, so output với V1) | Chỉ có synthetic K=32, 1 mapper; chưa có dữ liệu thật hay nhiều mapper; chưa hỗ trợ Spark | — |
 | 17 | Sinh dữ liệu synthetic | `SCAFFOLD/MOCK` (có chủ đích) | `scripts/generate_workload.py` ghi rõ “never describe these as Kaggle data” | Đủ cho kiểm thử hiệu năng có kiểm soát | Không thay được dữ liệu thật | — |
 | 18 | Chạy trên cụm YARN | `IMPLEMENTED-UNVERIFIED` | `scripts/run-cluster.sh`, `config/cluster.properties` (template) | Template | Không có cụm; **không khuyến nghị** làm trên máy 8 GB | — |
@@ -422,12 +424,12 @@ Thiết kế chi tiết ở [§18](#18-module-backend--frontend-hiển-thị-k�
 | `bigdata` / `ptit-bigdata:local` (build từ `Dockerfile`: Maven 3.9.11 + Temurin JDK 11, Python 3) | Build/test Maven, `DatasetTool`, `RevenueTool` V1–V5 (Hadoop MR 3.4.2, **LocalJobRunner**), `benchmark.py` | HDFS client: đọc/ghi `hdfs://namenode:8020/...`; ghi meta/kết quả nhỏ vào `results/` | Đang có, `DONE-VERIFIED` (giai đoạn 0) |
 | `namenode` / `apache/hadoop:3.4.2` (Java 8) | HDFS NameNode, UI `127.0.0.1:9870` | Metadata HDFS; đồng thời là client chạy `scripts/hdfs-ingest.sh` | Đã thêm (T1.1) |
 | `datanode` / `apache/hadoop:3.4.2` | HDFS DataNode, UI `127.0.0.1:9864` | Lưu block, replication = 1 | Đã thêm (T1.1) |
-| `spark` / `apache/spark:3.5.x-python3` (tag chính xác cần chốt ở T2.1; Docker Hub có `3.5.9-python3`) | PySpark `local[3]` | ETL, Group By A1–A7, feature, MLlib, publish serving | Chưa có (giai đoạn 2) |
+| ~~`spark` (Docker)~~ | — | **Không dùng** (2026-10-06): Spark chuyển sang chạy local trên host theo yêu cầu của nhóm, xem bảng dưới | Đã bỏ |
 | `serving-sync` (cùng image Hadoop) | `hdfs dfs -get` | Kéo `/data/ecommerce/serving/<run_id>/` về volume chỉ đọc (D11) | Chưa có (giai đoạn 6) |
 | `webapp` (FastAPI + build React) | Backend + frontend tĩnh, 1 container (D10) | Chỉ đọc serving artifacts | Chưa có (giai đoạn 6) |
 | `resourcemanager`, `nodemanager` (tùy chọn) | YARN | Chạy minh họa một lần (T1.7, P2), không thường trực | Chưa có |
 
-Volume Docker: `hdfs-namenode`, `hdfs-datanode` (named volume, nằm trong đĩa ảo WSL2 trên **ổ C:**). `hdfs dfsadmin -report` báo "Configured Capacity ≈ 1 TB" là kích thước ảo của đĩa WSL2. Giới hạn thật là dung lượng trống của ổ C: (~57 GB ngày 2026-10-06).
+Volume Docker: `hdfs-namenode`, `hdfs-datanode` (named volume, nằm trong đĩa ảo WSL2 trên **ổ C:**). `hdfs dfsadmin -report` báo "Configured Capacity ≈ 1 TB" là kích thước ảo của đĩa WSL2. Giới hạn thật là dung lượng trống của ổ C: (~57 GB ngày 2026-10-06). Để client trên host truy cập HDFS: NameNode publish `127.0.0.1:8020`, DataNode khai báo hostname `localhost` và publish `127.0.0.1:9866`; client bật `dfs.client.use.datanode.hostname=true`. `~/.wslconfig` được thêm `autoMemoryReclaim=dropCache` (bản sao lưu `~/.wslconfig.bak-20261006`) để VM trả RAM cho Spark local.
 
 **Chạy hoặc lưu local trên host Windows:**
 
@@ -440,6 +442,9 @@ Volume Docker: `hdfs-namenode`, `hdfs-datanode` (named volume, nằm trong đĩa
 | Trình duyệt | Xem NameNode UI (9870), DataNode UI (9864), Spark UI (4040, giai đoạn 2), web app (giai đoạn 6) | Cổng chỉ mở trên `127.0.0.1` |
 | Node.js 24 trên host (tùy chọn) | Chạy Vite dev server khi phát triển frontend | Chỉ lúc phát triển; bản demo chạy trong container `webapp` |
 | `sha256sum` trên host | Kiểm tra checksum dataset gốc | Đã dùng cho `docs/DATASET.md` |
+| Spark 4.0.4 (`spark-submit` từ PySpark trong `.venv`) + JDK 21 (`ms-21.0.12`) | Chạy job Java `vn.edu.bigdata.revenue.spark.SparkTool` (A1, ETL, A2–A5, A7) và notebook K-Means/KNN; đọc/ghi HDFS qua `hdfs://localhost:8020` | Cấu hình máy trong `config/spark-local.env` (không commit). Windows cần `HADOOP_HOME` có `winutils.exe`. Spark 4.0 không chạy trên JDK 23+ |
+| Maven 3.9.11 (`.tools/`, tự tải bởi `mvnw`) | Build profile `-Pspark` (Java 17 bytecode) trên host | `.\scripts\spark-local.ps1 build`; build mặc định MR (Java 11) vẫn chạy trong Docker |
+| Jupyter (`nbconvert`, `ipykernel` trong `.venv`) | Thực thi `notebooks/*.ipynb` và lưu output | Python 3.12 (`py -3`); thư viện trong `notebooks/requirements.txt` |
 
 **Không dùng** (có trên máy nhưng nằm ngoài dự án): JDK 21/25/26 trên host (enforcer yêu cầu JDK 11, nên build trong Docker); `E:\Library\hadoop-3.4.2` (`core-site.xml` trỏ `localhost:8020`) không được pipeline sử dụng; `python3` trên host là alias Microsoft Store (dùng `py -3` nếu cần chạy script phụ).
 
@@ -544,12 +549,12 @@ Nếu không đạt tiêu chí nghiệm thu (ví dụ category agreement@k khôn
 
 | ID | Task | Việc cụ thể | File | Phụ thuộc | Ước lượng | Nghiệm thu | Bằng chứng |
 |---|---|---|---|---|---|---|---|
-| T2.1 | Dịch vụ Spark | Service `spark` (image Apache Spark 3.5.x + Python, **tag cần xác minh**), `local[3]`, cấu hình `fs.defaultFS` tới namenode | `compose.yaml`, `spark/` (cần xác định) | T1.1 | 3–5 h | `spark.read.text("hdfs://…")` đếm được dòng của mẫu | Log |
-| T2.2 | Ingest + EDA chất lượng | Schema tường minh (string cho id, `DECIMAL(12,2)` cho giá), parse `event_time`, đếm null/giá ≤ 0/trùng hoàn toàn/`event_type` lạ | `spark/jobs/etl_events.py` (cần xác định) | T2.1 | 6–8 h | Báo cáo chất lượng JSON với số liệu thật; không có dòng bị mất không giải thích (tổng vào = hợp lệ + bị loại theo lý do) | `quality.json` |
-| T2.3 | Curated Parquet | Ghi `/curated/events/` partition `event_date`, `errorifexists` theo `run_id` | như trên | T2.2 | 3–4 h | Số dòng Parquet = số dòng hợp lệ T2.2 | `_run.json` |
-| T2.4 | A1 parity | Spark A1 đọc **raw** với chính sách lọc giống `PurchasePreparation` | `spark/jobs/agg_revenue.py` (cần xác định) | T2.1, T1.5 | 4–6 h | Khớp **chính xác** `(group, sum_minor, count)` với MR V1 trên mẫu 1% và 10% | Báo cáo so khớp |
-| T2.5 | A2–A5 | Funnel, conversion, thời gian, brand từ curated | `spark/jobs/agg_*.py` | T2.3 | 8–12 h | Ràng buộc chéo: tổng purchase A2 = count A1 (cùng policy); unit test trên fixture | Parquet + CSV nhỏ |
-| T2.6 | Test Spark | pytest với SparkSession local trên `events.csv` + oracle `expected-category-id.tsv` | `spark/tests/` (cần xác định) | T2.4 | 4 h | Test pass trong container | Log pytest |
+| T2.1 | Dịch vụ Spark | **XONG 2026-10-06 — đổi phương án:** Spark local trên host (không container), Spark 4.0.4 + JDK 21. Service `spark` (image Apache Spark 3.5.x + Python, **tag cần xác minh**), `local[3]`, cấu hình `fs.defaultFS` tới namenode | `compose.yaml`, `spark/` (cần xác định) | T1.1 | 3–5 h | `spark.read.text("hdfs://…")` đếm được dòng của mẫu | Log |
+| T2.2 | Ingest + EDA chất lượng | **XONG 2026-10-06** (`EventEtlJob`, `quality.json`). Schema tường minh (string cho id, `DECIMAL(12,2)` cho giá), parse `event_time`, đếm null/giá ≤ 0/trùng hoàn toàn/`event_type` lạ | `spark/jobs/etl_events.py` (cần xác định) | T2.1 | 6–8 h | Báo cáo chất lượng JSON với số liệu thật; không có dòng bị mất không giải thích (tổng vào = hợp lệ + bị loại theo lý do) | `quality.json` |
+| T2.3 | Curated Parquet | **XONG 2026-10-06** (Parquet đọc lại = số dòng hợp lệ). Ghi `/curated/events/` partition `event_date`, `errorifexists` theo `run_id` | như trên | T2.2 | 3–4 h | Số dòng Parquet = số dòng hợp lệ T2.2 | `_run.json` |
+| T2.4 | A1 parity | **XONG 2026-10-06** (`RevenueJob` RDD; khớp MR V1 và baseline trên D1, D2). Spark A1 đọc **raw** với chính sách lọc giống `PurchasePreparation` | `spark/jobs/agg_revenue.py` (cần xác định) | T2.1, T1.5 | 4–6 h | Khớp **chính xác** `(group, sum_minor, count)` với MR V1 trên mẫu 1% và 10% | Báo cáo so khớp |
+| T2.5 | A2–A5 | **XONG 2026-10-06** (`MetricsJob`; A1 = A2). Funnel, conversion, thời gian, brand từ curated | `spark/jobs/agg_*.py` | T2.3 | 8–12 h | Ràng buộc chéo: tổng purchase A2 = count A1 (cùng policy); unit test trên fixture | Parquet + CSV nhỏ |
+| T2.6 | Test Spark | **XONG 2026-10-06** (JUnit `SparkJobsTest` thay cho pytest vì lõi là Java). pytest với SparkSession local trên `events.csv` + oracle `expected-category-id.tsv` | `spark/tests/` (cần xác định) | T2.4 | 4 h | Test pass trong container | Log pytest |
 
 ### Giai đoạn 3: Thực nghiệm (P0/P1), xem §12
 
@@ -565,11 +570,11 @@ Nếu không đạt tiêu chí nghiệm thu (ví dụ category agreement@k khôn
 
 | ID | Task | Phụ thuộc | Ước lượng | Ưu tiên | Nghiệm thu |
 |---|---|---|---|---|---|
-| T4.1 | Feature sản phẩm (A7) + lọc ngưỡng | T2.5 | 4–6 h | P1 | Bảng feature + thống kê mô tả + số sản phẩm bị loại |
-| T4.2 | K-Means: quét K, silhouette, inertia, 3 seed | T4.1 | 6–8 h | P1 | Bảng §12.5 điền đủ; profile cụm; so sánh baseline |
-| T4.3 | KNN hướng B (LSH hoặc exact trên mẫu) | T4.1 | 6–8 h | P2 | Category agreement@k so với 2 baseline, có khoảng tin cậy bootstrap |
+| T4.1 | Feature sản phẩm (A7) + lọc ngưỡng | **XONG 2026-10-06** (`ProductFeaturesJob`, Java). T2.5 | 4–6 h | P1 | Bảng feature + thống kê mô tả + số sản phẩm bị loại |
+| T4.2 | K-Means: quét K, silhouette, inertia, 3 seed | **XONG 2026-10-06** (`notebooks/kmeans_product.ipynb`). T4.1 | 6–8 h | P1 | Bảng §12.5 điền đủ; profile cụm; so sánh baseline |
+| T4.3 | KNN hướng B (LSH hoặc exact trên mẫu) | **XONG 2026-10-06** (`notebooks/knn_product.ipynb`; kết quả âm một phần). T4.1 | 6–8 h | P2 | Category agreement@k so với 2 baseline, có khoảng tin cậy bootstrap |
 | T4.4 | (Tùy chọn) KNN hướng A | T2.3 | 12–16 h | P2 | Assertion chống rò rỉ pass; PR-AUC so với baseline |
-| T4.5 | E7: K-Means có/không cache | T4.2 | 2–3 h | P1 | Bảng E7 điền đủ; cùng seed, cùng K, cùng số vòng lặp; ghi rõ dữ liệu vào nằm trên HDFS |
+| T4.5 | E7: K-Means có/không cache | **XONG 2026-10-06** (trong notebook K-Means). T4.2 | 2–3 h | P1 | Bảng E7 điền đủ; cùng seed, cùng K, cùng số vòng lặp; ghi rõ dữ liệu vào nằm trên HDFS |
 
 ### Giai đoạn 5: Trực quan hóa, tài liệu, demo (P0 cho tài liệu)
 
@@ -639,12 +644,12 @@ Commit git, image tag (Hadoop, Spark), phiên bản Java/Python, `seed=21`, tỷ
 
 | Kiểm tra | Dữ liệu | Phương pháp | Kết quả |
 |---|---|---|---|
-| MR V1–V5 so với oracle | D0 | IT có sẵn | — |
-| MR V1 so với V2..V5 | D1, D2 | `DatasetTool compare` | — |
-| Spark A1 so với MR V1 | D1, D2 (D3 nếu có) | So `(group,sum_minor,count)` chính xác | — |
-| Spark A1 so với baseline độc lập | D1 | Script Python stdlib đọc CSV mẫu (không qua Spark/Hadoop) | — |
-| Bảo toàn số dòng ETL | D1..D3 | vào = hợp lệ + Σ(lý do loại) | — |
-| Ràng buộc chéo A1 và A2 | D1..D3 | Σcount A1 = Σpurchase A2 (cùng policy) | — |
+| MR V1–V5 so với oracle | D0 | IT có sẵn | Khớp (`docs/evidence/windows-docker`, `docs/evidence/hdfs`) |
+| MR V1 so với V2..V5 | D1, D2 | `DatasetTool compare` | Khớp: 4× "Results equal" mỗi mẫu (`docs/evidence/hdfs`) |
+| Spark A1 so với MR V1 | D1, D2 (D3 nếu có) | So `(group,sum_minor,count)` chính xác | Khớp: D1 308 nhóm, D2 495 nhóm; D3 chưa chạy (`docs/evidence/spark-java/README.md`) |
+| Spark A1 so với baseline độc lập | D1, D2, cả tháng (baseline) | `scripts/baseline_revenue.py` (Python stdlib) | Khớp D1, D2. Baseline cả tháng 10: 567 nhóm, 742 849 purchase hợp lệ = `validPurchaseCount` preflight MR |
+| Bảo toàn số dòng ETL | D1..D3 | vào = hợp lệ + Σ(lý do loại) | Đạt D1 (424 610 = 424 609 + 1), D2 (4 246 194 = 4 246 193 + 1) |
+| Ràng buộc chéo A1 và A2 | D1..D3 | Σcount A1 = Σpurchase A2 (cùng policy) | Đạt D1 (7 464), D2 (74 120) |
 
 ### 12.4 E2–E6: Hiệu năng và khả năng mở rộng
 
@@ -677,20 +682,20 @@ Ghi kèm cho mỗi dữ liệu: **số block HDFS** (`hdfs fsck … -blocks`), `
 
 | K | Inertia | Silhouette (seed 1/2/3) | Kích thước cụm nhỏ nhất |
 |---|---|---|---|
-| 2..10 | — | — | — |
+| 2..10 | Xem `docs/evidence/ml/README.md` | K = 2: 0.6811 (cao nhất); K = 3..10: 0.406–0.497 | K = 2: 3 691 |
 
 | KNN (hướng B) | k=5 | k=10 | k=20 |
 |---|---|---|---|
-| Category agreement@k (mô hình) | — | — | — |
-| Baseline ngẫu nhiên | — | — | — |
-| Baseline phổ biến | — | — | — |
+| Category agreement@k (mô hình) | 0.0556 | 0.0538 | 0.0530 |
+| Baseline ngẫu nhiên | 0.0148 | 0.0129 | 0.0126 |
+| Baseline phổ biến | 0.0760 | 0.0631 | 0.0696 |
 
 **E7: Thuật toán lặp và cache (kiểm chứng luận điểm Chương 1).** Cùng feature set A7 trên HDFS, cùng `k`, `seed`, `maxIter`, `tol=0` (để số vòng lặp cố định). Báo cáo median của ≥ 3 lần đo.
 
 | Cấu hình | Dữ liệu vào | Thời gian fit ms | Số vòng lặp thực tế | Ghi chú |
 |---|---|---|---|---|
-| Không `persist` | Parquet trên HDFS | — | — | |
-| `persist(MEMORY_ONLY)` + `count()` trước khi fit | như trên | — | — | Thời gian `count()` báo riêng |
+| Không `persist` | Parquet trên HDFS (D2, 25 084 sản phẩm) | 4 004 (median) | 20 (cố định) | RDD `pyspark.mllib`, K = 2 |
+| `cache()` + `count()` trước khi fit | như trên | 3 458 (median) | 20 | `count()` nạp cache 4 099–4 826 ms; tính cả bước này thì cache không có lợi ở quy mô này |
 
 Lưu ý: `KMeans` của Spark ML tự cache dữ liệu đầu vào nếu chưa được cache (cần xác minh trong mã nguồn hoặc log của phiên bản dùng). Nếu đúng vậy, phép so sánh phải thực hiện ở mức RDD (`pyspark.mllib.clustering.KMeans`) hoặc đọc log `StorageLevel`. Nếu chênh lệch không đáng kể, **báo cáo đúng như vậy** và giải thích nguyên nhân (dữ liệu nhỏ, OS page cache). Không mượn con số “sort 100 TB” trong slide làm kết quả của nhóm.
 
@@ -768,7 +773,7 @@ Quy tắc: mỗi bảng số liệu trong báo cáo có chú thích `run_id`, co
 |---|---|---|
 | D1 | Phương án A hay B **(ĐÃ DUYỆT 2026-10-06)** | **B tối thiểu**: HDFS + MR hiện có (oracle, chứng minh Map/Reduce) + Spark (đối chứng và mở rộng) |
 | D2 | Chế độ Hadoop **(ĐÃ DUYỆT 2026-10-06)** | HDFS pseudo-distributed 1 NN + 1 DN, MR chạy LocalJobRunner đọc/ghi HDFS. YARN **không thường trực**; chỉ chạy minh họa một lần (T1.7, P2) để khớp kiến trúc cụm trong slide Chương 2 nếu RAM cho phép |
-| D3 | Ngôn ngữ Spark **(ĐÃ DUYỆT 2026-10-06)** | **PySpark 3.5.x** trong container riêng |
+| D3 | Ngôn ngữ Spark **(ĐÃ DUYỆT 2026-10-06; ĐIỀU CHỈNH cùng ngày theo chỉ đạo của nhóm)** | Ban đầu: PySpark 3.5.x trong container. **Hiện tại:** phần lõi (ETL, A1–A5, A7) viết bằng **Java** trong package `vn.edu.bigdata.revenue.spark` (profile `-Pspark`), dùng lại `CsvEventParser`/`PurchasePreparation`/`Money` của MR; K-Means/KNN viết bằng **notebook Python**. Spark **4.0.4** chạy **local trên host** (máy chỉ có JDK 21/25/26, Spark 3.5 chỉ hỗ trợ tới Java 17); Hadoop client 3.4.1 tương thích HDFS 3.4.2 (R6 đã kiểm chứng trên D1, D2) |
 | D4 | Môi trường chuẩn **(ĐÃ DUYỆT 2026-10-06; phân bổ chi tiết ở §7.6)** | **Docker Compose** là cách chạy chính thức trên mọi máy (không cài JDK 11/Hadoop native) |
 | D5 | Phạm vi dữ liệu | Bắt buộc D1 (1%) và D2 (10%) của **một tháng**; D3 (cả tháng) nếu T1.6 cho thấy khả thi |
 | D6 | ML | K-Means sản phẩm = P1; KNN hướng B = P2 tùy chọn; hướng A chỉ khi dư nguồn lực |
