@@ -5,7 +5,55 @@ services:
       dockerfile: Dockerfile
     image: ptit-bigdata:local
     working_dir: /opt/bigdata
+    environment:
+      # Simple auth của HDFS lấy tên user client; ghi vào HDFS bằng user sở hữu cây /data.
+      HADOOP_USER_NAME: hadoop
     volumes:
       - ./data:/opt/bigdata/data
       - ./results:/opt/bigdata/results
     command: ["bash", "scripts/demo.sh", "results/docker-demo"]
+
+  # HDFS pseudo-distributed: docker compose up -d namenode datanode
+  # Không có depends_on từ bigdata, nên demo fixture vẫn chạy được khi HDFS tắt.
+  namenode:
+    image: apache/hadoop:3.4.2
+    hostname: namenode
+    command: ["hdfs", "namenode"]
+    env_file: config/hadoop.env
+    environment:
+      ENSURE_NAMENODE_DIR: /data/namenode
+      HDFS_NAMENODE_OPTS: -Xmx512m
+    mem_limit: 1g
+    ports:
+      - "127.0.0.1:9870:9870"
+    volumes:
+      - hdfs-namenode:/data
+      # Nguồn cho scripts/hdfs-ingest.sh; chỉ đọc để không thể sửa file gốc.
+      - ./data/raw:/staging/raw:ro
+      - ./scripts:/opt/bigdata/scripts:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost:9870/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  datanode:
+    image: apache/hadoop:3.4.2
+    hostname: datanode
+    command: ["hdfs", "datanode"]
+    env_file: config/hadoop.env
+    environment:
+      HDFS_DATANODE_OPTS: -Xmx512m
+    mem_limit: 1g
+    ports:
+      - "127.0.0.1:9864:9864"
+    volumes:
+      - hdfs-datanode:/data
+    depends_on:
+      namenode:
+        condition: service_healthy
+
+volumes:
+  hdfs-namenode:
+  hdfs-datanode:

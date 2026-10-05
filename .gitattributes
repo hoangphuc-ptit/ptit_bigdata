@@ -1,0 +1,9 @@
+# LF everywhere (matches .editorconfig); scripts and sources run inside Linux containers.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
+*.jar binary
+*.cmd text eol=crlf
+*.bat text eol=crlf
