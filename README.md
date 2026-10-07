@@ -2,6 +2,11 @@
 
 Project Java **đã triển khai** tổng/trung bình giá trị mua hàng theo danh mục với 5 phương án Hadoop MapReduce: trực tiếp, combiner, bounded in-mapper aggregation, dense aggregation bằng mảng primitive và packed batch theo reducer.
 
+> **Thành viên mới bắt đầu ở [`docs/HUONG_DAN_CHAY.md`](docs/HUONG_DAN_CHAY.md).** Repo kèm sẵn serving run đã chốt
+> (`serving/20261007-015257-b0376ef-d3/`, cả tháng 10/2019): chỉ cần Docker là xem được web demo
+> (`docker compose --profile web up -d --build webapp` → `http://localhost:8080`). Chạy lại toàn bộ HDFS → MapReduce/Spark → ML:
+> [`docs/END_TO_END.md`](docs/END_TO_END.md). Kiến trúc hiện tại và trạng thái: `docs/PROJECT_AUDIT_AND_IMPLEMENTATION_PLAN.md`.
+
 ## Chạy nhanh
 
 Yêu cầu JDK 11 và Python ≥3.9 cho benchmark. Maven wrapper tải Maven 3.9.11 nếu chưa có. Workspace hiện tại đã có JDK/Maven dưới `.tools/`; máy khác cần `JAVA_HOME` cho JDK 11.

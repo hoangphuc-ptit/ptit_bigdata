@@ -7,3 +7,6 @@
 *.jar binary
 *.cmd text eol=crlf
 *.bat text eol=crlf
+
+# Serving artifact: sha256 trong manifest.json tính trên đúng các byte publish ra (có CRLF); git phải giữ nguyên, không đổi xuống dòng.
+serving/** -text

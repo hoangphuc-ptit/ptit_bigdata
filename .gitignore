@@ -14,7 +14,10 @@ spark-warehouse/
 metastore_db/
 derby.log
 .pytest_cache/
-serving/
+# Serving run: chỉ commit run demo (đã chốt) để thành viên clone về chạy web ngay; run khác giữ cục bộ.
+/serving/*
+!/serving/20261007-015257-b0376ef-d3/
+!/serving/_LATEST
 node_modules/
 webapp/frontend/dist/
 *.tsbuildinfo

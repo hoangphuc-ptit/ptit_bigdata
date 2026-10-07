@@ -4,6 +4,9 @@ Tài liệu này nối các bước đã được chạy thật trên máy nhóm
 HDFS/MapReduce `docs/docker.md`, Spark `docs/spark-local.md`, ML `docs/ML.md`, web `webapp/README.md`,
 kế hoạch và trạng thái `docs/PROJECT_AUDIT_AND_IMPLEMENTATION_PLAN.md`.
 
+Chỉ cần xem web demo thì không phải chạy lại gì: repo đã kèm serving run `serving/20261007-015257-b0376ef-d3/`,
+xem `docs/HUONG_DAN_CHAY.md` mức 1. Tài liệu này dành cho việc tái lập toàn bộ kết quả từ dataset gốc.
+
 ## 1. Kiến trúc Big Data
 
 ```mermaid
