@@ -1209,7 +1209,7 @@ Node.js chỉ cần lúc build; bản chạy là file tĩnh do FastAPI phục v�
 | U1 | Báo cáo PDF + slide (T5.4) | Theo cấu trúc §13.2; mọi số liệu trích từ `docs/evidence/` kèm `run_id`; nêu cả kết quả âm (KNN thua Logistic Regression, KNN hướng B không vượt baseline phổ biến, Spark CSV chậm hơn MR V1 trên D3) |
 | U2 | Phân công nhóm `docs/TEAM.md` (§11, §13.1) | Cần biết nhóm 4 hay 5 người (câu hỏi §15.2-2); mỗi thành viên tự chạy demo một lần và lưu log |
 | U3 | Tổng duyệt demo ≤ 10 phút (T5.5) theo `docs/END_TO_END.md` §3 | Gọi trước các endpoint ML (warm-up) để tránh 6–9 s ở lần gọi đầu |
-| U4 | Runbook được thử trên **bản clone mới / máy khác** (T5.2, §3 dòng 19) | Người khác chạy theo `docs/END_TO_END.md` không cần hỏi; ghi lỗi gặp phải |
+| U4 | Runbook được thử trên **máy khác** (T5.2, §3 dòng 19) | 2026-10-07: đã thử bản clone mới **trên cùng máy** cho mức 1 của `docs/HUONG_DAN_CHAY.md` (web chạy với serving commit sẵn, `docs/evidence/webapp/README.md`). Còn lại: thành viên khác chạy mức 1 và mức 3 trên máy của mình, ghi lỗi gặp phải |
 | U5 | Biểu đồ cho báo cáo (T5.1) | Chụp từ web hoặc notebook; mỗi hình ghi `run_id`. Lưu ý: chụp màn hình Chrome bị timeout khi tab ở nền |
 | U6 | Lý thuyết Spark trong `docs/algorithms.md` | Physical plan partial/final aggregate (`revenue-df-plan.txt`), lineage RDD, phân biệt `reduceByKey` với Hadoop Reducer |
 | U7 | Câu hỏi còn mở §15.2: hạn nộp, giảng viên có bắt buộc YARN/web không | Quyết định mức cắt và có làm U9 không |

@@ -72,6 +72,17 @@ POST đúng body → hiển thị nhãn/láng giềng; form số đếm thô g�
   `when()` làm sập trang khi ngày không hợp lệ — có test.
 - Kiểm tra bằng ảnh chụp Edge headless ở 1440 px và 600 px trên dữ liệu D3 thật; image Docker build lại và phục vụ CSS mới.
 
+## Kiểm tra bản clone mới (2026-10-07, commit `b4aa7df`)
+
+`git clone --branch feat/nguyennd` vào thư mục trống rồi làm đúng mức 1 của `docs/HUONG_DAN_CHAY.md`:
+- `serving/20261007-015257-b0376ef-d3` có trong bản clone, sha256 khớp manifest 29/29 file (thư mục `serving/**` đánh dấu `-text`).
+- `docker compose --profile web build --no-cache webapp` thành công (1 phút 35 giây, base image đã có sẵn trên máy), `up -d webapp`:
+  `/api/health` UP; parity 567/567; bảng Brand trả dữ liệu; dự đoán K-Means khớp cụm Spark; dự đoán KNN trả 15 láng giềng, khớp notebook;
+  trang `/` hiển thị giao diện mới.
+- Lỗi phát hiện nhờ kiểm tra này: luật `.gitignore` cũ `serving/` đã chặn nhầm `webapp/backend/.../webapp/serving/` (`ServingRepository`),
+  nên commit `5ab0f9b` thiếu 3 file backend; đã thêm ở `b4aa7df`.
+- Giới hạn: kiểm tra trên cùng máy (Docker đã có base image); chưa thử trên máy thành viên khác.
+
 ## Chưa làm
 
 - Training API (P2), lịch sử dự đoán, nạp sẵn mô hình lúc khởi động. Danh sách đầy đủ: plan §19.
