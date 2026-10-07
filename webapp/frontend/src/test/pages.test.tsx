@@ -17,7 +17,7 @@ const knnMeta = {
   feature_preprocessing: "scaler",
 };
 const knnMetrics = {
-  test: { "KNN (K=3)": { precision: 1, recall: 1, f1: 1, pr_auc: 1, balanced_accuracy: 1, accuracy: 1, tp: 7, fp: 0, fn: 0, tn: 9 } },
+  test: { "KNN (K=3)": { precision: 0.75, recall: 0.5, f1: 0.6214, pr_auc: 0.6708, balanced_accuracy: 0.7, accuracy: 0.8, tp: 7, fp: 0, fn: 0, tn: 9 } },
   validationSweep: [{ k: 3, f1: 1, precision: 1, recall: 1, pr_auc: 1 }],
   testBootstrapCI95: {},
 };
@@ -70,6 +70,8 @@ describe("KnnPage", () => {
     expect(calls.find((c) => c.method === "POST")?.body).toEqual({ runId: KNN_RUN, productId: "p1" });
     // Confusion matrix lấy đúng từ metrics test của dòng KNN.
     expect(screen.getByText("Confusion matrix KNN")).toBeTruthy();
+    // F1 phải giữ 4 chữ số thập phân (lỗi cũ: bị làm tròn thành 1 vì nhầm là cột đếm).
+    expect(screen.getByText("0,6214")).toBeTruthy();
   });
 
   it("form số đếm thô gửi đủ 6 trường; lỗi 422 của backend hiện ra cho người dùng", async () => {
@@ -90,5 +92,14 @@ describe("KnnPage", () => {
       runId: KNN_RUN,
       raw: { views: 0, carts: 0, purchases: 0, medianPrice: 0, distinctUsers: 0, recentViews: 0 },
     });
+  });
+});
+
+describe("when", () => {
+  it("đổi ISO sang UTC rút gọn; chuỗi không phải ngày thì giữ nguyên, không làm hỏng trang", async () => {
+    const { when } = await import("../api");
+    expect(when("2026-10-06T17:01:39.415664+00:00")).toBe("2026-10-06 17:01 UTC");
+    expect(when("t")).toBe("t");
+    expect(when(undefined)).toBe("—");
   });
 });

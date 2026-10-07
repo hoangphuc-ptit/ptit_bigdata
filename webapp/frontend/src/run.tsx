@@ -32,5 +32,5 @@ export const useRun = () => useContext(RunContext);
 /** Chân biểu đồ: nguồn dữ liệu, theo quy tắc hiển thị của plan §18.7. */
 export function Source({ text }: { text: string }) {
   const { runId } = useRun();
-  return <p className="source">Nguồn: {text} · serving run {runId}</p>;
+  return <p className="source">Nguồn: {text}. Serving run <code>{runId}</code></p>;
 }

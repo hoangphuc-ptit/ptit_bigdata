@@ -1,4 +1,4 @@
-import ReactECharts from "echarts-for-react";
+import ReactECharts from "../chart";
 import { num } from "../api";
 import { useGet } from "../hooks";
 import { useRun } from "../run";
@@ -24,8 +24,8 @@ function BenchmarkCard({ name }: { name: string }) {
   const d = b.data;
   return (
     <section>
-      <h2>{d.experiment} — {d.title}</h2>
-      <p className="note">Dữ liệu: {d.dataset} · Phạm vi đo: {d.scope}</p>
+      <div className="section-head"><h2>{d.title}</h2><span className="tag">{d.experiment}</span></div>
+      <p className="note">Dữ liệu: {d.dataset}. Chỉ số: {d.metric} ({d.unit}).</p>
       <ReactECharts
         style={{ height: Math.max(220, d.rows.length * 34 + 60) }}
         option={{
@@ -36,8 +36,8 @@ function BenchmarkCard({ name }: { name: string }) {
               return `${r.label}<br/>median ${num(r.median, 0)} ${d.unit} (min ${num(r.min, 0)} – max ${num(r.max, 0)}), ${r.runs} lần đo`;
             },
           },
-          grid: { left: 200, right: 40 },
-          xAxis: { type: "value", name: `${d.metric} (${d.unit})` },
+          grid: { left: 210, right: 40, top: 12, bottom: 28 },
+          xAxis: { type: "value", axisLabel: { formatter: (v: number) => num(v, 0) } },
           yAxis: { type: "category", inverse: true, data: d.rows.map((r) => r.label) },
           series: [
             { type: "bar", data: d.rows.map((r) => r.median), name: "median" },
@@ -57,8 +57,8 @@ function BenchmarkCard({ name }: { name: string }) {
           ],
         }}
       />
-      <table>
-        <thead><tr><th>Cấu hình</th><th>Median</th><th>Min</th><th>Max</th><th>Số lần đo</th></tr></thead>
+      <div className="table-wrap"><table>
+        <thead><tr><th>Cấu hình</th><th className="num">Median</th><th className="num">Min</th><th className="num">Max</th><th className="num">Số lần đo</th></tr></thead>
         <tbody>
           {d.rows.map((r) => (
             <tr key={r.label}>
@@ -70,8 +70,8 @@ function BenchmarkCard({ name }: { name: string }) {
             </tr>
           ))}
         </tbody>
-      </table>
-      {d.notes?.map((n) => <p key={n} className="warn">{n}</p>)}
+      </table></div>
+      {d.notes?.length ? <ul className="notes">{d.notes.map((n) => <li key={n}>{n}</li>)}</ul> : null}
       <p className="source">Nguồn: {d.source}</p>
     </section>
   );
@@ -82,7 +82,7 @@ export default function Benchmarks() {
   const list = useGet<string[]>(runId ? `/api/analytics/${runId}/benchmarks` : null);
   return (
     <>
-      <h1>Hadoop MapReduce và Spark: tính đúng và hiệu năng</h1>
+      <header className="page-head"><h1>Hadoop MapReduce và Spark</h1><p className="lead">Cùng bài toán A1 trên cùng dữ liệu HDFS: kết quả khớp tuyệt đối, thời gian đo có lặp trên một máy.</p></header>
       <section>
         <p className="warn">
           Phạm vi: một máy (Windows 11, 4 nhân/8 luồng, RAM 7,9 GB), HDFS 1 NameNode + 1 DataNode trong Docker.

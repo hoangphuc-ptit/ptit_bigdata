@@ -51,6 +51,13 @@ export interface ModelEntry {
   metadata: Record<string, any>;
 }
 
+/** Thời điểm ISO -> "YYYY-MM-DD HH:mm UTC"; chuỗi không phải ngày hợp lệ thì giữ nguyên. */
+export const when = (iso?: string) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+};
+
 export const num = (v: string | number | undefined | null, digits = 2) => {
   const n = typeof v === "number" ? v : Number(v);
   return v === undefined || v === null || v === "" || Number.isNaN(n)

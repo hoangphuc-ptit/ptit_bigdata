@@ -56,11 +56,21 @@ KNN brute force trên 60 876 dòng train × 8 đặc trưng mất khoảng 10 ms
 
 ## Test tự động frontend
 
-`npm test` (Vitest 3 + jsdom + Testing Library, `src/test/pages.test.tsx`): 6/6 test đạt. Dữ liệu giả chỉ nằm trong `src/test`
+`npm test` (Vitest 3 + jsdom + Testing Library, `src/test/pages.test.tsx`): 7/7 test đạt. Dữ liệu giả chỉ nằm trong `src/test`
 (`fakeApi.ts` thay `fetch`, ECharts thay bằng stub) và không vào bản build (`tsconfig.json` loại `src/test`). Nội dung:
 định dạng số; lỗi ProblemDetail → thông báo; trang K-Means khi chưa có mô hình và khi API lỗi 503; trang KNN chọn sản phẩm →
 POST đúng body → hiển thị nhãn/láng giềng; form số đếm thô gửi đủ 6 trường và hiện lỗi 422. Đã thử cố ý sửa sai 2 kỳ vọng
 → 2 test fail như dự kiến, hoàn tác → 6/6 đạt.
+
+## Thiết kế lại giao diện (2026-10-07)
+
+- Thanh điều hướng dọc theo thứ tự pipeline (1 Pipeline → 2 Group By → 3 MapReduce và Spark → 4 K-Means → 5 KNN), chọn serving run ở chân thanh;
+  trang Pipeline mở đầu bằng kết quả đối chiếu MR/Spark và sơ đồ luồng; font Be Vietnam Pro + JetBrains Mono đóng gói cục bộ (`@fontsource`, không cần internet);
+  một theme ECharts chung (`src/chart.tsx`); số trên trục và bảng theo định dạng Việt Nam; dưới 900 px thanh điều hướng chuyển thành hàng ngang.
+- Lỗi phát hiện và sửa trong lúc làm: bảng Brand báo `422: Không có cột revenue` và cột doanh thu funnel trống (CSV thật là `revenue_minor`, nay đổi sang
+  tiền bằng cách chia 100); cột F1 trên trang KNN bị làm tròn thành 1/0 (nhầm là cột đếm) — có test hồi quy, đã thử đưa lại lỗi thì test fail;
+  `when()` làm sập trang khi ngày không hợp lệ — có test.
+- Kiểm tra bằng ảnh chụp Edge headless ở 1440 px và 600 px trên dữ liệu D3 thật; image Docker build lại và phục vụ CSS mới.
 
 ## Chưa làm
 

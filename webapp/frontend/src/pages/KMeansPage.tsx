@@ -1,6 +1,6 @@
-import ReactECharts from "echarts-for-react";
+import ReactECharts from "../chart";
 import { useEffect, useState } from "react";
-import { ModelEntry, num, post, Row } from "../api";
+import { ModelEntry, num, post, Row, when } from "../api";
 import { useGet } from "../hooks";
 import { Kpi } from "./Overview";
 import ProductPicker from "./ProductPicker";
@@ -33,7 +33,7 @@ export default function KMeansPage() {
   const metrics = detail.data?.metrics;
   return (
     <>
-      <h1>K-Means: phân cụm sản phẩm</h1>
+      <header className="page-head"><h1>K-Means: phân cụm sản phẩm</h1><p className="lead">Huấn luyện offline bằng Spark MLlib trên đặc trưng tổng hợp theo product_id. Dự đoán ở đây do backend tính từ mô hình đã lưu.</p></header>
       {models.error && <p className="error">{models.error}</p>}
       {models.data?.length === 0 && <p className="note">Chưa publish mô hình K-Means nào.</p>}
       {models.data && models.data.length > 0 && (
@@ -51,7 +51,7 @@ export default function KMeansPage() {
               <Kpi label="Silhouette" value={num(meta.metrics.silhouette, 4)} />
               <Kpi label="Inertia" value={num(meta.metrics.inertia, 1)} />
               <Kpi label="Số sản phẩm" value={num(meta.dataset.products, 0)} />
-              <Kpi label="Huấn luyện lúc" value={meta.training_time} />
+              <Kpi label="Huấn luyện lúc" value={when(meta.training_time)} />
             </div>
           )}
           {meta && <p className="note">Đặc trưng: {meta.features.join(", ")} · Tiền xử lý: {meta.feature_preprocessing}</p>}
@@ -67,7 +67,7 @@ export default function KMeansPage() {
               tooltip: { trigger: "axis" },
               legend: {},
               xAxis: { type: "category", name: "K", data: metrics.sweep.map((r: any) => r.k) },
-              yAxis: [{ type: "value", name: "silhouette" }, { type: "value", name: "inertia" }],
+              yAxis: [{ type: "value", name: "silhouette" }, { type: "value", name: "inertia", axisLabel: { formatter: (v: number) => num(v, 0) } }],
               series: [
                 { name: "silhouette", type: "line", data: metrics.sweep.map((r: any) => r.silhouette_mean) },
                 { name: "inertia", type: "line", yAxisIndex: 1, data: metrics.sweep.map((r: any) => r.inertia_mean) },
@@ -84,15 +84,15 @@ export default function KMeansPage() {
             option={{
               tooltip: {},
               xAxis: { type: "category", data: Object.keys(clusters.data.sizes) },
-              yAxis: { type: "value", name: "số sản phẩm" },
-              series: [{ type: "bar", data: Object.values(clusters.data.sizes) }],
+              yAxis: { type: "value", name: "số sản phẩm", axisLabel: { formatter: (v: number) => num(v, 0) } },
+              series: [{ type: "bar", barWidth: 56, itemStyle: { borderRadius: [3, 3, 0, 0] }, data: Object.values(clusters.data.sizes) }],
             }}
           />
           <table>
-            <thead><tr>{Object.keys(clusters.data.profile[0] ?? {}).map((c) => <th key={c}>{c}</th>)}</tr></thead>
+            <thead><tr>{Object.keys(clusters.data.profile[0] ?? {}).map((c) => <th key={c} className={c === "top_category_roots" ? "" : "num"}>{c}</th>)}</tr></thead>
             <tbody>
               {clusters.data.profile.map((r: Row, i: number) => (
-                <tr key={i}>{Object.values(r).map((v, j) => <td key={j}>{v}</td>)}</tr>
+                <tr key={i}>{Object.entries(r).map(([c, v]) => <td key={c} className={c === "top_category_roots" ? "wrap" : "num"}>{c === "top_category_roots" ? v : num(v, 4)}</td>)}</tr>
               ))}
             </tbody>
           </table>
@@ -101,7 +101,7 @@ export default function KMeansPage() {
       )}
       {runId && (
         <section>
-          <h2>Dự đoán cụm (backend suy luận từ mô hình đã huấn luyện)</h2>
+          <h2>Dự đoán cụm cho một sản phẩm</h2>
           <h3>Chọn sản phẩm thật</h3>
           <ProductPicker type="kmeans" runId={runId} onPick={(p) => predict({ productId: p.product_id })} />
           <h3>Hoặc nhập số đếm thô của một sản phẩm</h3>
