@@ -16,7 +16,10 @@
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-enforcer-plugin</artifactId><version>3.5.0</version><executions><execution><goals><goal>enforce</goal></goals><configuration><rules><requireJavaVersion><version>[11,12)</version><message>Use JDK 11 for this Hadoop project (JAVA_HOME or REVENUE_JAVA_HOME).</message></requireJavaVersion></rules></configuration></execution></executions></plugin>
     <plugin><groupId>com.diffplug.spotless</groupId><artifactId>spotless-maven-plugin</artifactId><version>2.43.0</version><configuration><java><googleJavaFormat><version>1.15.0</version></googleJavaFormat></java></configuration><executions><execution><phase>verify</phase><goals><goal>check</goal></goals></execution></executions></plugin>
     <!-- Package vn.edu.bigdata.revenue.spark chỉ build trong profile spark (Java 17, Spark 4); build mặc định giữ Java 11 cho Hadoop MR. -->
-    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.0</version><configuration><excludes><exclude>vn/edu/bigdata/revenue/spark/**</exclude></excludes><testExcludes><testExclude>vn/edu/bigdata/revenue/spark/**</testExclude></testExcludes></configuration></plugin>
+    <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.0</version><configuration><excludes><exclude>vn/edu/bigdata/revenue/spark/**</exclude></excludes><testExcludes><testExclude>vn/edu/bigdata/revenue/spark/**</testExclude></testExcludes>
+        <source>17</source>
+        <target>17</target>
+    </configuration></plugin>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.3</version></plugin>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-dependency-plugin</artifactId><version>3.8.1</version></plugin>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>3.6.0</version><executions><execution><phase>package</phase><goals><goal>shade</goal></goals><configuration>
@@ -27,7 +30,8 @@
   </plugins></build>
   <profiles>
     <!-- Spark local trên host: ./mvnw -Pspark package (JDK 17/21, REVENUE_JAVA_HOME). Chạy bằng spark-submit của PySpark cùng phiên bản. -->
-    <profile><id>spark</id>
+    <!-- Tự bật khi Maven/IDE chạy trên JDK >= 17 (host, IntelliJ) để IDE thấy dependency Spark; container MR dùng JDK 11 nên không bật. -->
+    <profile><id>spark</id><activation><jdk>[17,)</jdk></activation>
       <properties><maven.compiler.release>17</maven.compiler.release><spark.version>4.0.4</spark.version>
         <spark.test.argLine>-Xmx1g -XX:+IgnoreUnrecognizedVMOptions --add-modules=jdk.incubator.vector --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.nio.cs=ALL-UNNAMED --add-opens=java.base/sun.security.action=ALL-UNNAMED --add-opens=java.base/sun.util.calendar=ALL-UNNAMED -Djdk.reflect.useDirectMethodHandle=false -Dio.netty.tryReflectionSetAccessible=true</spark.test.argLine></properties>
       <dependencies>

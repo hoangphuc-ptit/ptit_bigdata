@@ -1,0 +1,67 @@
+# Bằng chứng web app (2026-10-07)
+
+Serving run `20261007-015257-b0376ef-d3` (D3, 29 file, manifest sha256: `docs/evidence/spark-java/d3/serving-manifest-20261007-015257.json`),
+đồng bộ bằng `scripts/serving-sync.ps1` (sha256 khớp 29/29).
+
+## Backend (Spring Boot 3.5.16, JDK 21.0.12)
+
+- `mvn -B clean package` trong `webapp/backend` với `SERVING_DIR=../../serving`: 7 test pass (`backend-clean-package.log`).
+  `ServingParityTest` trên artifact thật: K-Means 92 592/92 592 sản phẩm cùng cụm với Spark; KNN 64 254/64 254 sản phẩm test
+  cùng `vote_share` và nhãn với notebook; đặc trưng tính lại từ số đếm thô lệch < 1e-12.
+- Chạy thật `java -Xmx512m -jar target/revenue-webapp.jar` (không HDFS cũng được), gọi bằng curl:
+  `/api/health` (UP, 2 run), `/api/runs`, bảng `revenue_by_category` (567 dòng), `/api/ml/kmeans/models`, `/clusters`, `/products`,
+  `POST /api/ml/kmeans/predict` theo productId (cụm khớp Spark) và theo số đếm thô (cảnh báo ngoài miền khi views < 20 hoặc carts > views),
+  `POST /api/ml/knn/predict` theo productId (trả 15 láng giềng, vote_share, nhãn thật).
+  Ca lỗi: thiếu `recentViews` → 422; gửi cả productId và raw → 422; mô hình không tồn tại → 404; số âm → 400.
+  Khi thư mục serving rỗng: `/api/health` trả `NO_DATA`, API mô hình trả 404 (không có số giả).
+- Lỗi đã sửa trong lúc xác minh: `AnalyticsController.sortKey` không compile; mô hình bị liệt kê trùng khi nhiều serving run chứa
+  cùng một mô hình (`ModelRegistry.list` giờ giữ bản trong serving run mới nhất; sau sửa `/models` trả 1 mô hình mỗi loại).
+
+## Frontend (React 18 + TypeScript + Vite 6 + ECharts)
+
+- `npm install` + `npm run build` (`tsc -b && vite build`) đạt; bundle 1,25 MB (cảnh báo > 500 kB, chưa tách chunk).
+- Kiểm tra thủ công trên Chrome (`http://localhost:8080`, backend phục vụ `frontend/dist`):
+  Tổng quan (dataset d3, 42 448 765 dòng vào ETL, badge "KHỚP TUYỆT ĐỐI" 567/567, danh sách 29 artifact);
+  `/ml/kmeans` (K = 2, silhouette 0,6494, hồ sơ cụm; chọn sản phẩm 1002099 → cụm 0, "Spark đã gán: 0 · khớp");
+  `/ml/knn` (bảng test KNN/baseline/Logistic Regression, confusion matrix; chọn sản phẩm 1000978 → "có purchase", vote_share 1,
+  nhãn thật 1, 15 láng giềng); Benchmark (11 bảng E2–E7, 11 biểu đồ, không lỗi JavaScript).
+- Ảnh chụp: chụp màn hình bị timeout khi tab Chrome ở trạng thái nền (`document.visibilityState = hidden`); nội dung trang được
+  xác minh qua DOM/văn bản thay cho ảnh.
+
+## Docker image (T6.10)
+
+- `docker compose --profile web build webapp` (multi-stage: Node 24 build React → Maven/JDK 21 build + 7 unit test, parity test tự bỏ qua
+  vì image không có serving → JRE 21): thành công, log `docker-build.log`.
+- Đã **tắt HDFS** (`docker compose stop namenode datanode`) rồi `docker compose --profile web up -d webapp`: `/api/health` = UP,
+  `servingDir=/serving` (mount chỉ đọc), `/` và `/ml/knn` trả 200 (React do Spring Boot phục vụ). RAM container 149 MiB / giới hạn 768 MiB.
+
+## Độ trễ API (T6.8) — `api-latency.json`
+
+`py -3 scripts/api_latency.py` trên container: request tuần tự, 1 client cùng máy, 1 warmup + 200 lần đo mỗi endpoint.
+
+| Endpoint | Lần gọi đầu (cold) ms | p50 ms | p95 ms |
+|---|---:|---:|---:|
+| `GET /api/runs` | 21 | 18,5 | 39,8 |
+| `GET .../tables/revenue_by_category` | 145 | 5,9 | 30,2 |
+| `GET .../tables/funnel_by_brand?q=` | 64 | 4,6 | 23,9 |
+| `GET .../benchmarks/e4-spark-modes` | 16 | 4,3 | 25,2 |
+| `GET /api/ml/kmeans/{run}/clusters` | 64 | 7,9 | 30,4 |
+| `GET /api/ml/kmeans/{run}/products?q=` | **6 511** | 9,6 | 30,2 |
+| `POST /api/ml/kmeans/predict` (productId / raw) | 194 / 53 | 8,6 / 8,6 | 29,9 / 21,7 |
+| `POST /api/ml/knn/predict` (productId / raw) | **9 202** / 10 | 10,7 / 12,7 | 30,2 / 31,4 |
+
+Tiêu chí p95 < 300 ms: **đạt** ở mọi endpoint. Hạn chế: lần gọi đầu cần nạp và kiểm sha256 `assignments.csv` (12,8 MB),
+`products.csv` (11,6 MB) và `train_set.csv` (10,7 MB) nên mất 6–9 s; nên gọi trước (warm-up) trước khi demo.
+KNN brute force trên 60 876 dòng train × 8 đặc trưng mất khoảng 10 ms mỗi dự đoán.
+
+## Test tự động frontend
+
+`npm test` (Vitest 3 + jsdom + Testing Library, `src/test/pages.test.tsx`): 6/6 test đạt. Dữ liệu giả chỉ nằm trong `src/test`
+(`fakeApi.ts` thay `fetch`, ECharts thay bằng stub) và không vào bản build (`tsconfig.json` loại `src/test`). Nội dung:
+định dạng số; lỗi ProblemDetail → thông báo; trang K-Means khi chưa có mô hình và khi API lỗi 503; trang KNN chọn sản phẩm →
+POST đúng body → hiển thị nhãn/láng giềng; form số đếm thô gửi đủ 6 trường và hiện lỗi 422. Đã thử cố ý sửa sai 2 kỳ vọng
+→ 2 test fail như dự kiến, hoàn tác → 6/6 đạt.
+
+## Chưa làm
+
+- Training API (P2), lịch sử dự đoán, nạp sẵn mô hình lúc khởi động. Danh sách đầy đủ: plan §19.

@@ -21,6 +21,15 @@ RESULTS_ML = PROJECT_ROOT / "results" / "ml"
 FEATURES_ROOT = "/data/ecommerce/features/product"
 # Phải trùng ProductFeaturesJob.FEATURES (Java); notebook kiểm tra cột tồn tại khi đọc.
 FEATURES = ["log_views", "log_carts", "log_purchases", "cart_rate", "purchase_rate", "log_median_price", "log_distinct_users"]
+# A8 (ProductLabelJob, Java): đặc trưng trước mốc t0 + nhãn "có purchase trong [t0, t0 + label_days)".
+LABELS_ROOT = "/data/ecommerce/features/product_label"
+LABEL_FEATURES = FEATURES + ["recent_view_share"]
+
+
+def param(name: str, default=None):
+    """Tham số notebook qua biến môi trường (chạy bằng nbconvert); rỗng = dùng mặc định."""
+    value = os.environ.get(name, "")
+    return value if value.strip() else default
 
 
 def load_local_env() -> None:
@@ -93,16 +102,32 @@ def environment(spark) -> dict:
     }
 
 
-def write_hdfs_json(spark, path: str, value) -> None:
-    """Ghi JSON nhỏ lên HDFS, create-only (overwrite=false)."""
+def write_hdfs_text(spark, path: str, text: str) -> None:
+    """Ghi file văn bản nhỏ (JSON/CSV) lên HDFS, create-only (overwrite=false)."""
     jvm = spark.sparkContext._jvm
     target = jvm.org.apache.hadoop.fs.Path(hdfs(path))
     fs = target.getFileSystem(spark.sparkContext._jsc.hadoopConfiguration())
     stream = fs.create(target, False)
     try:
-        stream.write(bytearray(json.dumps(value, indent=2, default=str).encode("utf-8")))
+        stream.write(bytearray(text.encode("utf-8")))
     finally:
         stream.close()
+
+
+def read_hdfs_text(spark, path: str) -> str:
+    """Đọc file văn bản nhỏ trên HDFS qua FileSystem API (spark.read bỏ qua file tên bắt đầu bằng '_')."""
+    jvm = spark.sparkContext._jvm
+    target = jvm.org.apache.hadoop.fs.Path(hdfs(path))
+    fs = target.getFileSystem(spark.sparkContext._jsc.hadoopConfiguration())
+    stream = fs.open(target)
+    try:
+        return jvm.org.apache.commons.io.IOUtils.toString(stream, "UTF-8")
+    finally:
+        stream.close()
+
+
+def write_hdfs_json(spark, path: str, value) -> None:
+    write_hdfs_text(spark, path, json.dumps(value, indent=2, default=str))
 
 
 class Trace:
@@ -126,3 +151,94 @@ class Trace:
         local_dir.mkdir(parents=True, exist_ok=True)
         (local_dir / f"{self.record['job']}-run.json").write_text(json.dumps(self.record, indent=2, default=str), encoding="utf-8")
         return self.record
+
+
+# --- KNN phân loại và metric nhị phân (numpy thuần, không cần scikit-learn) ---------------------
+# Cùng thuật toán sẽ được viết lại bằng Java ở backend; giữ phép tính đơn giản, tất định để đối chiếu.
+
+
+def knn_vote_share(train_x, train_y, query_x, k: int, chunk: int = 256):
+    """Tỷ lệ láng giềng nhãn 1 trong k láng giềng gần nhất (Euclidean bình phương, cộng theo thứ tự cột).
+
+    Hòa khoảng cách ở ranh giới thứ k: chọn điểm train có chỉ số nhỏ hơn trước (tất định).
+    vote_share là tỷ lệ phiếu, KHÔNG phải xác suất đã hiệu chỉnh.
+    """
+    import numpy as np
+
+    train_x = np.asarray(train_x, dtype=np.float64)
+    train_y = np.asarray(train_y, dtype=np.float64)
+    query_x = np.asarray(query_x, dtype=np.float64)
+    if not 1 <= k <= len(train_x):
+        raise ValueError(f"k={k} ngoài [1, {len(train_x)}]")
+    out = np.empty(len(query_x))
+    for start in range(0, len(query_x), chunk):
+        q = query_x[start:start + chunk]
+        d = np.zeros((len(q), len(train_x)))
+        for j in range(train_x.shape[1]):
+            diff = q[:, j, None] - train_x[None, :, j]
+            d += diff * diff
+        kth = np.partition(d, k - 1, axis=1)[:, k - 1]
+        below = d < kth[:, None]
+        tied = d == kth[:, None]
+        need = k - below.sum(axis=1)
+        chosen = below | (tied & (np.cumsum(tied, axis=1) <= need[:, None]))
+        out[start:start + len(q)] = (chosen * train_y[None, :]).sum(axis=1) / k
+    return out
+
+
+def binary_metrics(y_true, y_pred) -> dict:
+    import numpy as np
+
+    y_true = np.asarray(y_true).astype(int)
+    y_pred = np.asarray(y_pred).astype(int)
+    tp = int(((y_true == 1) & (y_pred == 1)).sum())
+    fp = int(((y_true == 0) & (y_pred == 1)).sum())
+    fn = int(((y_true == 1) & (y_pred == 0)).sum())
+    tn = int(((y_true == 0) & (y_pred == 0)).sum())
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    specificity = tn / (tn + fp) if tn + fp else 0.0
+    return {
+        "tp": tp, "fp": fp, "fn": fn, "tn": tn,
+        "accuracy": (tp + tn) / len(y_true),
+        "precision": precision, "recall": recall,
+        "f1": 2 * precision * recall / (precision + recall) if precision + recall else 0.0,
+        "balanced_accuracy": (recall + specificity) / 2,
+    }
+
+
+def average_precision(y_true, scores) -> float:
+    """PR-AUC theo định nghĩa average precision (bậc thang), điểm bằng nhau được xét cùng lúc."""
+    import numpy as np
+
+    y_true = np.asarray(y_true).astype(int)
+    scores = np.asarray(scores, dtype=np.float64)
+    positives = y_true.sum()
+    if positives == 0:
+        return float("nan")
+    order = np.argsort(-scores, kind="stable")
+    s, y = scores[order], y_true[order]
+    last = np.r_[np.nonzero(np.diff(s))[0], len(s) - 1]   # chỉ số cuối mỗi nhóm điểm bằng nhau
+    tp = np.cumsum(y)[last]
+    fp = (last + 1) - tp
+    precision = tp / (tp + fp)
+    recall = tp / positives
+    return float(np.sum(np.diff(np.r_[0.0, recall]) * precision))
+
+
+def best_threshold(y_true, scores, candidates) -> float:
+    """Ngưỡng (dự đoán 1 khi score >= ngưỡng) cho F1 cao nhất; hòa thì chọn ngưỡng lớn hơn."""
+    import numpy as np
+
+    y = np.asarray(y_true).astype(int) == 1
+    s = np.asarray(scores, dtype=np.float64)
+    best = None
+    for t in sorted(set(float(c) for c in candidates), reverse=True):
+        pred = s >= t
+        tp = int((pred & y).sum())
+        precision = tp / int(pred.sum()) if pred.any() else 0.0
+        recall = tp / int(y.sum()) if y.any() else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        if best is None or f1 > best[1]:
+            best = (t, f1)
+    return best[0]

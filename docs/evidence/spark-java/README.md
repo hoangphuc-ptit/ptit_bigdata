@@ -54,3 +54,31 @@ Job metrics/features D2 chạy trùng lúc với `spotless:apply` trong Docker n
 - Lần chạy Python PySpark trước đó (đã bỏ theo yêu cầu: lõi viết bằng Java) cho thấy ETL D2 bị `OutOfMemoryError` với 1 GB khi persist dòng rộng;
   bản Java không persist, đọc raw 2 lượt (ghi curated, đếm lý do) và đo chất lượng trên Parquet đã ghi.
 - `d*-*.log` là log `spark-submit` đầy đủ (mức INFO trước khi job đặt WARN).
+
+## D3 — cả tháng 10/2019 (2026-10-06/07, commit `b0376ef` + thay đổi chưa commit)
+
+Chạy bằng `.\scripts\spark-pipeline.ps1 -InputPath /data/ecommerce/raw/2019-Oct.csv -Tag d3` (`local[2]`, driver 1 GB, 8 shuffle partitions),
+tổng 83 phút. run_id ở `d3-run-ids.tsv`, log `d3-*.log`, artifact cục bộ `d3/<run_id>/`.
+Lỗi `ShutdownHookManager ... Failed to delete ...\Temp\spark-*` ở cuối một số log là Spark không xóa được thư mục tạm trên Windows khi tắt; job đã ghi "xong" trước đó.
+
+| Kiểm tra | Kết quả D3 | Bằng chứng |
+|---|---|---|
+| Spark A1 (RDD) = baseline Python độc lập | Khớp: 567 nhóm, 742 849 purchase | `d3-baseline-compare.txt` |
+| Spark A1 = MR V1 (output `e2-d3/e9b35a9b6869-1-v1` của E2) | Khớp tuyệt đối 567/567 nhóm (sum_minor, count, avg) | `d3/revenue_parity-mr-v1-vs-spark.json` (bước publish) |
+| ETL bảo toàn số dòng | 42 448 765 vào = 42 448 764 hợp lệ + 1 header | `d3/20261006-224118-b0376ef-d3/etl-run.json` |
+| Σpurchase A2 = Σcount A1 | 742 849 = 742 849 | `d3/20261006-230505-b0376ef-d3/metrics-run.json` |
+| A7: sản phẩm / giữ (views ≥ 20) | 166 794 / 92 592; views p50/p75/p90/p95/p99 = 25/90/322/714/3 091 | `features-summary.json` |
+| A8: train (t0 = 2019-10-15) / test (t0 = 2019-10-25) | 60 876 sp (28,0% dương) / 64 254 sp (25,3% dương); max event_time lịch sử < t0 ở cả hai | `d3/20261006-233917-b0376ef-d3/labels-summary.json` |
+
+Chất lượng cả tháng (`quality.json`): view 40 779 399, cart 926 516, purchase 742 849, không có `remove_from_cart`; `category_code` rỗng 13 515 609 dòng (31,8%),
+`brand` rỗng 6 113 008 (14,4%), `user_session` rỗng 2 dòng; giá 0: 68 673 sự kiện, 0 purchase giá 0; 166 794 sản phẩm, 3 022 290 user, 9 244 421 phiên.
+Không đếm trùng lặp ở D3 (`--duplicates false`: phép đếm trùng toàn cột quá nặng cho RAM máy).
+
+| Job (một lần chạy, không phải benchmark) | End-to-end ms | Bước chính |
+|---|---:|---|
+| revenue (A1, RDD) | 392 938 | map+reduceByKey 383 691 |
+| etl | 1 414 028 | ghi Parquet 778 575; đếm lý do 383 258; chất lượng 246 242 |
+| metrics (A2–A5) | 409 981 | — |
+| features (A7) | 1 617 927 | product_stats 1 597 742 (countDistinct user + percentile_approx giá trên 42 triệu dòng) |
+| labels (A8) | 1 076 345 | ghi 2 ảnh chụp 1 051 174 |
+| publish serving | 21 714 | — |

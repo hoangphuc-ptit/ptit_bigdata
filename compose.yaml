@@ -60,6 +60,19 @@ services:
       namenode:
         condition: service_healthy
 
+  # Web app (Spring Boot + React): chỉ đọc ./serving (đồng bộ bằng scripts/serving-sync.ps1), không cần HDFS khi chạy.
+  #   docker compose --profile web up -d --build webapp  ->  http://localhost:8080
+  webapp:
+    build:
+      context: webapp
+    image: ptit-bigdata-webapp:local
+    mem_limit: 768m
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./serving:/serving:ro
+    profiles: ["web"]
+
 volumes:
   hdfs-namenode:
   hdfs-datanode:

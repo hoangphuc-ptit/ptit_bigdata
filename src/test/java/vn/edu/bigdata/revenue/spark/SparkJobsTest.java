@@ -71,6 +71,26 @@ class SparkJobsTest {
   }
 
   @Test
+  void revenueDataFrameOnCsvAndParquetMatchesOracle(@TempDir Path dir) throws Exception {
+    List<String> expected =
+        Files.readAllLines(FIXTURES.resolve("expected-category-id.tsv"), StandardCharsets.UTF_8);
+    Dataset<Row> events =
+        EventEtlJob.curated(EventEtlJob.parsed(spark, uri(FIXTURES.resolve("events.csv"))));
+    String parquet = uri(dir.resolve("curated"));
+    events.write().partitionBy("event_date").parquet(parquet);
+    for (RevenueJob.Result result :
+        List.of(
+            RevenueJob.computeFrame(events),
+            RevenueJob.computeFrame(spark.read().parquet(parquet)))) {
+      List<String> actual = new ArrayList<>();
+      for (List<Object> row : RevenueJob.csvRows(result.rows))
+        actual.add(row.get(0) + "\t" + row.get(1) + "\t" + row.get(2) + "\t" + row.get(3));
+      assertEquals(expected, actual);
+      assertTrue(result.lineage.contains("HashAggregate"), result.lineage);
+    }
+  }
+
+  @Test
   void revenueClassifiesLikePurchasePreparation(@TempDir Path dir) throws Exception {
     String input =
         csv(
@@ -162,6 +182,44 @@ class SparkJobsTest {
     assertEquals("brand", brand.getAs("brand"));
     assertEquals(6L, (long) brand.getAs("purchases"));
     assertEquals(6003L, (long) brand.getAs("revenue_minor"));
+  }
+
+  @Test
+  void productLabelsUseOnlyHistoryBeforeT0(@TempDir Path dir) throws Exception {
+    String input =
+        csv(
+            dir,
+            "2019-10-01 10:00:00 UTC,view,p1,10,a.b,x,10.00,u1,s1",
+            "2019-10-02 10:00:00 UTC,view,p1,10,a.b,x,10.00,u2,s2",
+            "2019-10-03 00:00:00 UTC,purchase,p1,10,a.b,x,10.00,u2,s2",
+            "2019-10-01 11:00:00 UTC,view,p2,10,a.b,x,5.00,u1,s1",
+            "2019-10-02 11:00:00 UTC,view,p2,10,a.b,x,5.00,u1,s1",
+            "2019-10-03 12:00:00 UTC,view,p2,10,a.b,x,5.00,u3,s3",
+            "2019-10-04 09:00:00 UTC,view,p2,10,a.b,x,5.00,u3,s3",
+            "2019-10-05 08:00:00 UTC,purchase,p2,10,a.b,x,5.00,u3,s3");
+    Dataset<Row> events = EventEtlJob.curated(EventEtlJob.parsed(spark, input));
+    java.time.LocalDate train = java.time.LocalDate.parse("2019-10-03");
+    java.time.LocalDate test = java.time.LocalDate.parse("2019-10-05");
+
+    Map<String, Row> rows = new HashMap<>();
+    for (Row r : ProductLabelJob.snapshot(events, train, 2, 1, 2, "train").collectAsList())
+      rows.put(r.getAs("product_id"), r);
+    // Purchase lúc đúng 00:00 của t0 thuộc cửa sổ nhãn, không thuộc lịch sử.
+    assertEquals(0L, (long) rows.get("p1").getAs("purchases"));
+    assertEquals(1, (int) rows.get("p1").getAs("label"));
+    assertEquals(0, (int) rows.get("p2").getAs("label"));
+    assertEquals(0.5, (double) rows.get("p1").getAs("recent_view_share"), 1e-12);
+
+    List<Row> testRows = ProductLabelJob.snapshot(events, test, 2, 1, 2, "test").collectAsList();
+    assertEquals(1, testRows.size());
+    assertEquals("p2", testRows.get(0).getAs("product_id"));
+    assertEquals(1, (int) testRows.get(0).getAs("label"));
+
+    assertEquals(true, ProductLabelJob.checks(events, train, 2, 1).get("historyBeforeT0"));
+    // Cửa sổ nhãn vượt quá dữ liệu: phải từ chối thay vì gán nhãn 0.
+    org.junit.jupiter.api.Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> ProductLabelJob.checks(events, java.time.LocalDate.parse("2019-10-05"), 2, 3));
   }
 
   @Test

@@ -10,11 +10,15 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 $envFile = Join-Path $root "config\spark-local.env"
 if (-not (Test-Path $envFile)) { throw "Thiếu ${envFile} (sao chép từ config\spark-local.env.example)" }
+# Giá trị trong file ghi đè môi trường (JAVA_HOME của máy có thể là JDK không hợp lệ), trừ các tham số
+# Spark đã đặt sẵn trong phiên: scripts\spark-bench.ps1 dùng chúng để thay master/partitions khi đo.
+$sessionKeys = @("SPARK_MASTER", "SPARK_DRIVER_MEMORY", "SPARK_SHUFFLE_PARTITIONS") |
+  Where-Object { [Environment]::GetEnvironmentVariable($_) }
 foreach ($line in Get-Content $envFile -Encoding UTF8) {
   $line = $line.Trim()
   if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
     $key, $value = $line.Split("=", 2)
-    Set-Item -Path "Env:$($key.Trim())" -Value $value.Trim()
+    if ($sessionKeys -notcontains $key.Trim()) { Set-Item -Path "Env:$($key.Trim())" -Value $value.Trim() }
   }
 }
 $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"

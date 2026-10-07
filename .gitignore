@@ -14,3 +14,7 @@ spark-warehouse/
 metastore_db/
 derby.log
 .pytest_cache/
+serving/
+node_modules/
+webapp/frontend/dist/
+*.tsbuildinfo
